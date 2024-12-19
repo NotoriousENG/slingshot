@@ -21,7 +21,6 @@ class Main : ApplicationAdapter() {
     private lateinit var texSlingshot: Texture
     private lateinit var texBall: Texture
     private var position: Vector2 = Vector2(350.0f, 64.0f)
-    private var input: Vector2 = Vector2(0.0f, 0.0f)
     private val speed = 300.0f
     private val shots = arrayListOf<Shot>()
 
@@ -34,29 +33,9 @@ class Main : ApplicationAdapter() {
 
     override fun render() {
         val delta = Gdx.graphics.deltaTime
-
-        //input()
         update(delta)
         draw()
     }
-
-    // private fun input() {
-    //     this.input = Vector2(0.0f, 0.0f);
-
-    //     if (Gdx.input.isKeyPressed(Keys.W) || Gdx.input.isKeyPressed(Keys.UP)) {
-    //         input.y += 1.0f;
-    //     }
-    //     if (Gdx.input.isKeyPressed(Keys.A) || Gdx.input.isKeyPressed(Keys.LEFT)) {
-    //         input.x -= 1.0f;
-    //     }
-    //     if (Gdx.input.isKeyPressed(Keys.S) || Gdx.input.isKeyPressed(Keys.DOWN)) {
-    //         input.y -= 1.0f;
-    //     }
-    //     if (Gdx.input.isKeyPressed(Keys.D) || Gdx.input.isKeyPressed(Keys.RIGHT)) {
-    //         input.x += 1.0f;
-    //     }
-    //     this.input = this.input.nor();
-    // }
 
     private fun update(delta: Float) {
         val screenHeight = Gdx.graphics.getHeight().toFloat();
