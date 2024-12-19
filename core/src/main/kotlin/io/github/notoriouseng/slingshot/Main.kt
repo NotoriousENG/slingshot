@@ -10,6 +10,7 @@ import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Vector
 import com.badlogic.gdx.Input.Keys
 import com.badlogic.gdx.Input
+import com.badlogic.gdx.utils.Timer
 import ktx.app.clearScreen
 
 data class Shot(var pos: Vector2, var vel: Vector2)
@@ -20,15 +21,33 @@ class Main : ApplicationAdapter() {
     private lateinit var shapeRenderer: ShapeRenderer
     private lateinit var texSlingshot: Texture
     private lateinit var texBall: Texture
+    private lateinit var texMan: Texture
     private var position: Vector2 = Vector2(350.0f, 64.0f)
     private val speed = 300.0f
     private val shots = arrayListOf<Shot>()
+    private val men = arrayListOf<Vector2>()
+    private val spawnInterval = 2f // Spawn every 2 seconds
 
     override fun create() {
         spriteBatch = SpriteBatch()
         shapeRenderer = ShapeRenderer()
         texSlingshot = Texture(Gdx.files.internal("textures/slingshot.png"))
         texBall = Texture(Gdx.files.internal("textures/ball.png"))
+        texMan = Texture(Gdx.files.internal("textures/man.png"))
+
+        // Schedule the spawn task
+        Timer.schedule(object : Timer.Task() {
+            override fun run() {
+                spawnMan()
+            }
+        }, 0f, spawnInterval) // Delay: 0s, Repeat: every spawnInterval seconds
+    }
+
+    private fun spawnMan() {
+        // Add a new object at a random position (example: within screen bounds)
+        val x = (Math.random() * Gdx.graphics.width).toFloat()
+        val y = 900.0f
+        men.add(Vector2(x, y))
     }
 
     override fun render() {
@@ -56,6 +75,7 @@ class Main : ApplicationAdapter() {
         }
 
         updateShots(delta)
+        updateMen(delta)
     }
 
     private fun updateShots(delta: Float) {
@@ -75,13 +95,40 @@ class Main : ApplicationAdapter() {
         }
     }
 
+    private fun updateMen(delta: Float) {
+        val iterator = men.iterator()
+        val speed = -48.0f
+        while (iterator.hasNext()) {
+            val man = iterator.next()
+            // Apply gravity to the vertical direction
+            man.y += speed * delta
+            if (man.y < -120.0f) {
+                iterator.remove()
+                continue
+            }
+            val shotIterator = shots.iterator()
+            while (shotIterator.hasNext()) {
+                val shot = shotIterator.next()
+                if (shot.pos.dst(man) <= 64.0f) {
+                    //shotIterator.remove()
+                    iterator.remove()
+                    break
+                }
+            }
+        }
+    }
+
     private fun draw() {
         clearScreen(0f, 0f, 0f, 1f)
         spriteBatch.begin()
         spriteBatch.draw(texSlingshot, 300.0f, 000.0f)
         spriteBatch.draw(texBall, this.position.x, this.position.y)
+
         for (shot in this.shots) {
             spriteBatch.draw(texBall, shot.pos.x, shot.pos.y)
+        }
+        for (man in this.men) {
+            spriteBatch.draw(texMan, man.x, man.y)
         }
         spriteBatch.end()
 
@@ -98,5 +145,6 @@ class Main : ApplicationAdapter() {
         shapeRenderer.dispose()
         texSlingshot.dispose()
         texBall.dispose()
+        texMan.dispose()
     }
 }
