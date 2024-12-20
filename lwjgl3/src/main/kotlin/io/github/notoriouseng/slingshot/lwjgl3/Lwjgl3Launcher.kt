@@ -14,6 +14,7 @@ fun main() {
     Lwjgl3Application(Main(), Lwjgl3ApplicationConfiguration().apply {
         setTitle("Slingshot")
         setWindowedMode(800, 600)
+        setResizable(false)
         setWindowIcon(*(arrayOf(128, 64, 32, 16).map { "libgdx$it.png" }.toTypedArray()))
     })
 }

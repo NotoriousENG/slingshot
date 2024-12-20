@@ -1,0 +1,9 @@
+music/LunarJoyride.mp3
+Lunar Joyride (Background Music) - FoxSynergy
+https://opengameart.org/content/lunar-joyride-8-bit
+CC-BY-3.0
+
+sfx/oof.ogg
+Boing Raw Copyright 2005 cfork <http://freesound.org/people/cfork/> Boing Jump Copyright 2012 Iwan Gabovitch <http://qubodup.net>
+https://opengameart.org/content/cute-cartoon-jump-sound-effect
+CC-BY-3.0

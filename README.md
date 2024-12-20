@@ -1,8 +1,12 @@
 # Slingshot
+Basic slingshot defense game made in Kotlin.
 
 A [libGDX](https://libgdx.com/) project generated with [gdx-liftoff](https://github.com/libgdx/gdx-liftoff).
 
 This project was generated with a template that includes Kotlin application launchers and an empty `ApplicationAdapter` implemented in Kotlin.
+
+# Asset Attribution
+See [attribution.txt](assets/attribution.txt) for all non in-house assets
 
 ## Platforms
 

@@ -8,6 +8,8 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.Input
+import com.badlogic.gdx.audio.Music
+import com.badlogic.gdx.audio.Sound
 import com.badlogic.gdx.graphics.Cursor
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.utils.Timer
@@ -29,6 +31,10 @@ class Main : ApplicationAdapter() {
     private lateinit var texSlingshot: Texture
     private lateinit var texBall: Texture
     private lateinit var texMan: Texture
+    private lateinit var texSky: Texture
+    private lateinit var sfxOof: Sound
+    private lateinit var sfxBoing: Sound
+    private lateinit var  musicBg: Music
     private var position: Vector2 = Vector2(350.0f, 64.0f)
     private val speed = 300.0f
     private val shots = arrayListOf<Shot>()
@@ -45,7 +51,14 @@ class Main : ApplicationAdapter() {
         texSlingshot = Texture(Gdx.files.internal("textures/slingshot.png"))
         texBall = Texture(Gdx.files.internal("textures/ball.png"))
         texMan = Texture(Gdx.files.internal("textures/man.png"))
+        texSky = Texture(Gdx.files.internal("textures/sky.png"))
         font = BitmapFont() // Default font provided by LibGDX
+        sfxOof = Gdx.audio.newSound(Gdx.files.internal("sfx/oof.ogg"))
+        sfxBoing = Gdx.audio.newSound(Gdx.files.internal("sfx/boing-jump.ogg"))
+        musicBg = Gdx.audio.newMusic(Gdx.files.internal("music/LunarJoyride.mp3"))
+        musicBg.volume = 0.5f
+        musicBg.isLooping = true
+        musicBg.play()
         // Schedule the spawn task
         Timer.schedule(object : Timer.Task() {
             override fun run() {
@@ -108,9 +121,11 @@ class Main : ApplicationAdapter() {
             if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
                 val dir = slingshotOrigin.cpy().sub(this.position).nor()
                 val fac = abs(slingshotOrigin.cpy().dst(this.position)) * 10.0f
+                val facVolume = abs(ballStart.cpy().dst(this.position)) * 10.0f
                 val shot = Shot(this.position.cpy(), dir.cpy().scl(fac))
                 this.shots.add(shot)
                 this.slingshotActive = false;
+                this.sfxBoing.play(0.6f, clamp(facVolume / 1400, 0.5f, 3.0f), 0.0f)
             }
         }
 
@@ -154,6 +169,7 @@ class Main : ApplicationAdapter() {
                 val shot = shotIterator.next()
                 if (shot.pos.dst(man.pos) <= 64.0f) {
                     //shotIterator.remove()
+                    sfxOof.play()
                     iterator.remove()
                     score++
                     break
@@ -163,8 +179,9 @@ class Main : ApplicationAdapter() {
     }
 
     private fun draw() {
-        clearScreen(0f, 0f, 0f, 1f)
+        clearScreen(0.14f, 0.67f, 0.74f, 1f)
         spriteBatch.begin()
+        spriteBatch.draw(texSky, 0f, 0f)
         spriteBatch.draw(texSlingshot, 300.0f, 000.0f)
         spriteBatch.draw(texBall, this.position.x, this.position.y)
 
@@ -191,6 +208,8 @@ class Main : ApplicationAdapter() {
     }
 
     override fun dispose() {
+        musicBg.dispose()
+        texSky.dispose()
         texSlingshot.dispose()
         texBall.dispose()
         texMan.dispose()
