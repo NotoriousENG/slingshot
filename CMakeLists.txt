@@ -23,6 +23,12 @@ else()
     find_package(sdl2-ttf REQUIRED)
 endif()
 
+# Find Python3
+find_package(Python3 REQUIRED) # required for post build steps
+
+# Print the Python3 executable path
+message(STATUS "Python 3 executable: ${Python3_EXECUTABLE}")
+
 # Add library subdirectories
 add_subdirectory(lib/clm)
 
@@ -56,17 +62,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE clm)
 
 target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}/include")
 
-# Copy the assets folder to the build directory
-add_custom_target(copy_assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
+# Define the Python script path
+set(PY_COPY_ASSETS ${CMAKE_CURRENT_LIST_DIR}/scripts/copy_assets.py)
+add_custom_target(copy_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E echo "Running Python script to copy and update HTML..."
+    COMMAND ${Python3_EXECUTABLE} ${PY_COPY_ASSETS} ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${PROJECT_NAME}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    COMMENT "Copying and updating HTML with Python script"
 )
-add_dependencies(${PROJECT_NAME} copy_assets)
 
-if( ${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
-    add_custom_target(copy_html
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/web/index.html ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.html
-        # replace "index.js" in ${PROJECT_NAME}.html with "${PROJECT_NAME}.js"
-        COMMAND sed -i "s/index.js/${PROJECT_NAME}.js/g" ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.html
-    )
-    add_dependencies(${PROJECT_NAME} copy_html)
-endif()
+add_dependencies(${PROJECT_NAME} copy_assets)
