@@ -8,6 +8,8 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+#define VIRTUAL_WIDTH 800
+#define VIRTUAL_HEIGHT 600
 #define NUM_SHOTS 100
 #define NUM_MEN 100
 #define MAX_SOUND_CHANNELS 8
@@ -46,7 +48,16 @@ typedef struct GameState {
   Mix_Chunk *sfx[SFX_IDX_COUNT];
   Mix_Music *music;
   TTF_Font *font;
-  
+
+  // Virtual screen handling
+  int virtualWidth;
+  int virtualHeight;
+  float scale;
+  int offsetX;
+  int offsetY;
+  SDL_Rect viewport;
+  SDL_Texture *virtualScreen;
+
   vec2 ballStart;
   vec2 ballPos;
   vec2 slingshotPos;
@@ -59,13 +70,13 @@ typedef struct GameState {
   bool slingshotActive;
   int mouseX, mouseY;
   int mouseButtonDown;
-  
+
   Shot shots[NUM_SHOTS];
   int numShots;
-  
-  Man men[NUM_MEN]; 
+
+  Man men[NUM_MEN];
   int numMen;
-  
+
   SDL_TimerID spawnTimerId;
   SDL_TimerID rateTimerId;
 

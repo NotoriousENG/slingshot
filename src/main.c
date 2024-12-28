@@ -12,6 +12,8 @@ GameState game;
 
 int main(int argc, char *argv[]) {
   // Initialize game state
+  game.virtualWidth = VIRTUAL_WIDTH;
+  game.virtualHeight = VIRTUAL_HEIGHT;
   game.ballStart = (vec2){350.0f, 536.0f};
   game.ballPos = game.ballStart;
   game.slingshotPos = (vec2){300, 472};
@@ -24,6 +26,43 @@ int main(int argc, char *argv[]) {
     cleanupSDL();
     return -1;
   }
+
+  // Create virtual screen texture that matches window size
+  int w, h;
+  SDL_GetWindowSize(game.window, &w, &h);
+  game.virtualWidth = w;
+  game.virtualHeight = h;
+
+  game.virtualScreen = SDL_CreateTexture(
+      game.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+      game.virtualWidth, game.virtualHeight);
+  SDL_SetTextureBlendMode(game.virtualScreen, SDL_BLENDMODE_BLEND);
+
+  // No scaling or letterboxing needed since virtual matches window
+  game.scale = 1.0f;
+  game.offsetX = 0;
+  game.offsetY = 0;
+
+  // Viewport covers entire window
+  game.viewport.x = 0;
+  game.viewport.y = 0;
+  game.viewport.w = game.virtualWidth;
+  game.viewport.h = game.virtualHeight;
+
+  // Adjust game object positions based on screen dimensions
+  float heightRatio = (float)game.virtualHeight / VIRTUAL_HEIGHT;
+  float widthRatio = (float)game.virtualWidth / VIRTUAL_WIDTH;
+
+  game.ballStart.y *= heightRatio;
+  game.ballStart.x *= widthRatio;
+  game.ballPos = game.ballStart;
+
+  game.slingshotPos.x *= widthRatio;
+  game.slingshotPos.y *= heightRatio;
+
+  // Scale slingshot sprite dimensions
+  game.rects[TEX_IDX_SLINGSHOT].w *= widthRatio;
+  game.rects[TEX_IDX_SLINGSHOT].h *= heightRatio;
 
   Mix_PlayMusic(game.music, -1);
 
@@ -53,6 +92,7 @@ void main_loop() {
   update(delta);
   draw();
 }
+
 static bool initSDL(void) {
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
     printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
@@ -71,9 +111,9 @@ static bool initSDL(void) {
     return false;
   }
 
-  game.window =
-      SDL_CreateWindow("Slingshot", SDL_WINDOWPOS_UNDEFINED,
-                       SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+  game.window = SDL_CreateWindow("Slingshot", SDL_WINDOWPOS_UNDEFINED,
+                                 SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH,
+                                 SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE);
   if (!game.window) {
     printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
     return false;
@@ -166,6 +206,7 @@ static void cleanupSDL(void) {
   }
   Mix_FreeMusic(game.music);
   TTF_CloseFont(game.font);
+  SDL_DestroyTexture(game.virtualScreen);
   SDL_DestroyRenderer(game.renderer);
   SDL_DestroyWindow(game.window);
 
@@ -177,7 +218,48 @@ static void cleanupSDL(void) {
 
 static void handleEvents(SDL_Event *e, bool *running) {
   while (SDL_PollEvent(e) != 0) {
+    if (e->type == SDL_WINDOWEVENT) {
+      if (e->window.event == SDL_WINDOWEVENT_RESIZED) {
+        int w = e->window.data1;
+        int h = e->window.data2;
+
+        // Recreate virtual screen at new window size
+        SDL_DestroyTexture(game.virtualScreen);
+        game.virtualWidth = w;
+        game.virtualHeight = h;
+        game.virtualScreen = SDL_CreateTexture(
+            game.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+            game.virtualWidth, game.virtualHeight);
+        SDL_SetTextureBlendMode(game.virtualScreen, SDL_BLENDMODE_BLEND);
+
+        // Update viewport to match new size
+        game.viewport.w = w;
+        game.viewport.h = h;
+
+        // Adjust game object positions for new dimensions
+        float heightRatio = (float)h / VIRTUAL_HEIGHT;
+        float widthRatio = (float)w / VIRTUAL_WIDTH;
+
+        game.ballStart.y = 536.0f * heightRatio;
+        game.ballStart.x = 350.0f * widthRatio;
+        game.ballPos = game.ballStart;
+
+        game.slingshotPos.x = 300 * widthRatio;
+        game.slingshotPos.y = 472 * heightRatio;
+
+        // Scale slingshot sprite dimensions
+        SDL_QueryTexture(game.textures[TEX_IDX_SLINGSHOT], NULL, NULL,
+                         &game.rects[TEX_IDX_SLINGSHOT].w,
+                         &game.rects[TEX_IDX_SLINGSHOT].h);
+        game.rects[TEX_IDX_SLINGSHOT].w *= widthRatio;
+        game.rects[TEX_IDX_SLINGSHOT].h *= heightRatio;
+      }
+    }
+
+    // Mouse coordinates are already in virtual space since they match window
+    // space
     SDL_GetMouseState(&game.mouseX, &game.mouseY);
+
     if (e->type == SDL_QUIT) {
       *running = false;
     }
@@ -192,7 +274,10 @@ static void handleEvents(SDL_Event *e, bool *running) {
 static void update(float delta) {
   SDL_SetCursor(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW));
 
-  vec2 slingshotOrigin = vec2_new(348.0f, 468.0f);
+  // Scale slingshot origin based on screen size
+  float heightRatio = (float)game.virtualHeight / VIRTUAL_HEIGHT;
+  float widthRatio = (float)game.virtualWidth / VIRTUAL_WIDTH;
+  vec2 slingshotOrigin = vec2_new(348.0f * widthRatio, 468.0f * heightRatio);
   vec2 mouse = vec2_new((float)game.mouseX, (float)game.mouseY);
 
   if (!game.slingshotActive) {
@@ -211,8 +296,8 @@ static void update(float delta) {
     game.ballPos.x = mouse.x - game.dim.x;
     game.ballPos.y = mouse.y - game.dim.y;
 
-    game.ballPos.x = clampf(game.ballPos.x, -16.0f, 816.0f);
-    game.ballPos.y = clampf(game.ballPos.y, -16.0f, 616.0f);
+    game.ballPos.x = clampf(game.ballPos.x, -16.0f, game.virtualWidth + 16.0f);
+    game.ballPos.y = clampf(game.ballPos.y, -16.0f, game.virtualHeight + 16.0f);
 
     if (!game.mouseButtonDown) {
       vec2 dir = vec2_normalize(vec2_subtract(slingshotOrigin, game.ballPos));
@@ -236,11 +321,14 @@ static void update(float delta) {
 }
 
 static void draw() {
+  // Set render target to virtual screen
+  SDL_SetRenderTarget(game.renderer, game.virtualScreen);
+
   SDL_SetRenderDrawColor(game.renderer, 36, 171, 189, 255);
   SDL_RenderClear(game.renderer);
 
   // Draw sky background
-  SDL_Rect destRect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+  SDL_Rect destRect = {0, 0, game.virtualWidth, game.virtualHeight};
   SDL_RenderCopy(game.renderer, game.textures[TEX_IDX_SKY], NULL, &destRect);
 
   // Draw slingshot
@@ -274,6 +362,12 @@ static void draw() {
   renderScore();
   renderSlingshot();
 
+  // Reset render target to window
+  SDL_SetRenderTarget(game.renderer, NULL);
+  SDL_RenderClear(game.renderer);
+
+  // Draw virtual screen directly to window without letterboxing
+  SDL_RenderCopy(game.renderer, game.virtualScreen, NULL, &game.viewport);
   SDL_RenderPresent(game.renderer);
 }
 
@@ -287,7 +381,7 @@ static void renderScore(void) {
   SDL_Texture *scoreTexture =
       SDL_CreateTextureFromSurface(game.renderer, scoreSurface);
 
-  SDL_Rect destRect = {40, 10, scoreSurface->w, scoreSurface->h};
+  SDL_Rect destRect = {24, 24, scoreSurface->w, scoreSurface->h};
   SDL_RenderCopy(game.renderer, scoreTexture, NULL, &destRect);
 
   SDL_FreeSurface(scoreSurface);
@@ -302,7 +396,7 @@ static void renderScore(void) {
     SDL_Texture *hiscoreTexture =
         SDL_CreateTextureFromSurface(game.renderer, hiscoreSurface);
 
-    destRect.x = 580;
+    destRect.x = game.virtualWidth - hiscoreSurface->w - 24;
     destRect.w = hiscoreSurface->w;
     destRect.h = hiscoreSurface->h;
     SDL_RenderCopy(game.renderer, hiscoreTexture, NULL, &destRect);
@@ -313,18 +407,21 @@ static void renderScore(void) {
 }
 
 static void renderSlingshot(void) {
+  float widthRatio = (float)game.virtualWidth / VIRTUAL_WIDTH;
+  float heightRatio = (float)game.virtualHeight / VIRTUAL_HEIGHT;
+
   SDL_SetRenderDrawColor(game.renderer, 255, 255, 255, 255);
-  SDL_RenderDrawLine(game.renderer, 310, 500,
-                     (int)(game.ballPos.x + game.dim.x),
-                     (int)(game.ballPos.y + game.dim.y));
-  SDL_RenderDrawLine(game.renderer, 418, 500,
-                     (int)(game.ballPos.x + game.dim.x),
-                     (int)(game.ballPos.y + game.dim.y));
+  SDL_RenderDrawLine(
+      game.renderer, (int)(310 * widthRatio), (int)(500 * heightRatio),
+      (int)(game.ballPos.x + game.dim.x), (int)(game.ballPos.y + game.dim.y));
+  SDL_RenderDrawLine(
+      game.renderer, (int)(418 * widthRatio), (int)(500 * heightRatio),
+      (int)(game.ballPos.x + game.dim.x), (int)(game.ballPos.y + game.dim.y));
 }
 
 static void updateShots(float delta) {
-  float screenWidth = (float)SCREEN_WIDTH;
-  float screenHeight = (float)SCREEN_HEIGHT;
+  float screenWidth = (float)game.virtualWidth;
+  float screenHeight = (float)game.virtualHeight;
   float gravity = 980.0f;
   float dim = 32.0f;
 
@@ -351,7 +448,7 @@ static void updateMen(float delta) {
     Man *man = &game.men[i];
     man->pos.y += man->speed * delta;
 
-    if (man->pos.y > 720.0f) {
+    if (man->pos.y > game.virtualHeight) {
       game.hiscore = (game.score > game.hiscore) ? game.score : game.hiscore;
       game.score = 0;
       game.numMen = 0;
@@ -376,7 +473,7 @@ static void updateMen(float delta) {
 }
 
 static void spawnMan() {
-  float x = (float)(rand() % (SCREEN_WIDTH - 32));
+  float x = (float)(rand() % (game.virtualWidth - 32));
   float y = -100.0f;
   float speed = (48.0f + ((float)rand() / RAND_MAX) * 100.0f);
 
