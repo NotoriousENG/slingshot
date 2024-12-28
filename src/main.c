@@ -29,7 +29,13 @@ int main(int argc, char *argv[]) {
 
   // Create virtual screen texture that matches window size
   int w, h;
+#ifdef EMSCRIPTEN
+  // Get display size on web
+  emscripten_get_canvas_element_size("#canvas", &w, &h);
+  SDL_SetWindowSize(game.window, w, h);
+#else
   SDL_GetWindowSize(game.window, &w, &h);
+#endif
   game.virtualWidth = w;
   game.virtualHeight = h;
 
