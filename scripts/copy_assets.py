@@ -78,9 +78,10 @@ def copy_and_update_html(source_file, target_file, project_name):
         print(f"Error: Source file '{source_file}' does not exist.")
         return
 
-    if not needs_update(source_file, target_file):
-        print(f"Skipped (up to date): {source_file}")
-        return
+    # @TODO: add back in once i figure out why this breaks GH Actions
+    # if not needs_update(source_file, target_file):
+    #     print(f"Skipped (up to date): {source_file}")
+    #     return
 
     # Copy and update the HTML file
     shutil.copy(source_file, target_file)

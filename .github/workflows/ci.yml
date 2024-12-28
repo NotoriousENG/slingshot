@@ -1,0 +1,219 @@
+name: Release Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  release_web:
+    name: Web Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          lfs: true
+
+      - name: Create Build Directory
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-multilib python3 curl zip unzip
+          sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev
+
+      - name: Configure Emscripten
+        shell: bash
+
+        # Change the directory to be emsdk instead of the project root
+        working-directory: ${{github.workspace}}/emsdk
+        run: |
+          ./emsdk install latest
+          ./emsdk activate latest
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -Wno-dev -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+
+      - name: Build
+
+        run: cmake --build ./build --config Release
+
+      - name: Run copy_assets.py
+        # run the copy_assets.py directly since cmake on CI/CD doesn't pass env variable
+        run: CMAKE_SYSTEM_NAME=Emscripten python3 scripts/copy_assets.py ./ ./build Slingshot
+
+      - name: Create Artifact
+        run: |
+          mkdir release
+          cp build/Slingshot.html release/index.html
+          cp build/Slingshot.js release/Slingshot.js
+          cp build/Slingshot.wasm release/Slingshot.wasm
+          cp build/Slingshot.data release/Slingshot.data
+          cp -r build/assets release/assets
+
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release
+          path: release
+      
+      - name: Install Butler
+        run: |
+          curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip
+          chmod +x butler
+          ./butler -V
+
+      - name: Create release zip and run Butler
+
+        # Here we say that we will use the BUTLER_API_KEY as an environment variable
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          cd release
+          zip -r ../web.zip *
+          cd ..
+
+          # Butler will read the API key from the environment variable
+          ./butler login
+          ./butler push web.zip NotoriousENG/slingshot:html5
+          ./butler logout
+
+  release_linux:
+    name: Linux Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          lfs: true
+
+      - name: Create Build Directory
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Install Packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-multilib python3 curl zip unzip
+          sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev
+      
+      - name: Install SDL packages and libvorbis
+        run: |
+          sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libvorbis-dev
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -Wno-dev
+      
+      - name: Build
+        run: cmake --build ./build --config Release
+
+      - name: Run CMAKE copy_assets
+        # run the cmake copy_assets command
+        run: cmake --build ./build --target copy_assets
+
+      - name: Create Artifact
+        run: |
+          mkdir release
+          cp build/Slingshot release/Slingshot
+          cp -r build/assets release/assets
+
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: release
+      
+      - name: Install Butler
+        run: |
+          curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip
+          chmod +x butler
+          ./butler -V
+
+      - name: Create release zip and run Butler
+
+        # Here we say that we will use the BUTLER_API_KEY as an environment variable
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          cd release
+          zip -r ../linux.zip *
+          cd ..
+
+          # Butler will read the API key from the environment variable
+          ./butler login
+          ./butler push linux.zip NotoriousENG/slingshot:linux
+          ./butler logout
+
+  release_windows:
+    name: Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          lfs: true
+
+      - name: install cmake
+        run: |
+          choco install cmake
+
+      - name: Setup vcpkg dependencies
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: '**/vcpkg.json'
+          runVcpkgInstall: true
+
+      - name: Create Build Directory
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Configure CMake (use vcpkg toolchain file and windows commands)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/vcpkg/scripts/buildsystems/vcpkg.cmake -Wno-dev
+      
+      - name: Build
+        run: cmake --build ./build --config Release
+      
+      - name: Run CMAKE copy_assets
+        # run the cmake copy_assets command
+        run: cmake --build ./build --target copy_assets
+
+      - name: Create Artifact (using windows commands, copy exe, assets and all .dll files in the same folder)
+        run: |
+          mkdir release
+          copy build\Release\Slingshot.exe release\Slingshot.exe
+          copy build\Release\*.dll release
+          xcopy /E /I build\assets release\assets
+
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release
+      
+      - name: Install Butler for Windows
+        run: |
+          curl -L -o butler.zip https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default
+          unzip butler.zip
+          ./butler -V
+
+      - name: Create release zip and run Butler (using windows commands)
+
+        # Here we say that we will use the BUTLER_API_KEY as an environment variable
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          cd release
+          7z a ../windows.zip *
+          cd ..
+
+          # Butler will read the API key from the environment variable
+          ./butler login
+          ./butler push windows.zip NotoriousENG/slingshot:windows
+          ./butler logout
