@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "sdl_ttf.h": "c",
+        "sdl.h": "c",
+        "clm.h": "c",
+        "__config": "c"
+    }
+}
